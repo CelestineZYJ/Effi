@@ -7,6 +7,7 @@ import hashlib
 from typing import BinaryIO, Iterable, Iterator, Union
 import json
 import pytz
+from tqdm import tqdm 
 
 # Copyright 2022 DeepMind Technologies Limited
 #
@@ -158,5 +159,8 @@ with gzip.open(_file_name_by_streamingqa_subset['eval'], 'rb') as input_file:
         streamingqa_eval.append(json.loads(line.decode()))
 
 
-
+for qa in tqdm(streamingqa_eval):
+    question = qa['question']
+    true_answer = qa['answers']  # Assuming the first answer is the ground truth
+    x=1
 
