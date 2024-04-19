@@ -14,7 +14,7 @@ import pandas as pd
 from typing import Dict, List, Mapping, Union
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, StateDictType, FullStateDictConfig
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 import datasets
 
@@ -56,11 +56,12 @@ os.environ["HF_DATASETS_CACHE"] = "data/.hf_dataset_cache"
 os.environ["WANDB_PROJECT"] = "SIU"
 
 # Define parameters
-BASE_MODEL_PATH = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+# BASE_MODEL_PATH = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+BASE_MODEL_PATH='NousResearch/Llama-2-7b-chat-hf'
 SEQ_LENGTH = 1024
 LR = 3e-5
 WEIGHT_DECAY = 0.0
-PER_DEVICE_BSZ = 4
+PER_DEVICE_BSZ = 1
 GRAD_ACC = 1
 N_EPOCH = 10
 RATIO = 0.03
@@ -74,23 +75,6 @@ print(f"Saving to {OUTPUT_DIR}")
 
 os.environ["HF_DATASETS_CACHE"] = "data/.hf_dataset_cache"
 os.environ["WANDB_PROJECT"] = "SIU"
-
-# Define parameters
-BASE_MODEL_PATH = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-SEQ_LENGTH = 1024
-LR = 3e-5
-WEIGHT_DECAY = 0.0
-PER_DEVICE_BSZ = 4
-GRAD_ACC = 1
-N_EPOCH = 10
-RATIO = 0.03
-DATA_ROOT = "data"
-
-# Define output directory
-EXP_ID = f"{BASE_MODEL_PATH}-lr{LR}-seq{SEQ_LENGTH}-ratio{RATIO}"
-OUTPUT_DIR = f"models/ckpts/{EXP_ID}"
-os.environ["WANDB_NAME"] = EXP_ID
-print(f"Saving to {OUTPUT_DIR}")
 
 # Set sys.argv to simulate command line arguments
 sys.argv = [
@@ -110,8 +94,8 @@ sys.argv = [
     "--weight_decay", str(WEIGHT_DECAY),
     "--lr_scheduler_warmup_ratio", str(RATIO),
     "--block_size", str(SEQ_LENGTH),
-    "--train_file", os.path.join(DATA_ROOT, "instructQDoc_train.json"),
-    "--validation_file", os.path.join(DATA_ROOT, "instructQDoc_dev.json")
+    "--train_file", os.path.join(DATA_ROOT, "pretrainDoc_train.json"),
+    "--validation_file", os.path.join(DATA_ROOT, "pretrainDoc_dev.json")
 ]
 
 def parse_args():
@@ -464,7 +448,7 @@ def main():
         p_token = tokenizer(prompt_).input_ids
         loss_masks.extend([0] * len(p_token))
         tokens.extend(p_token)
-        c_token = tokenizer(target, max_length=960,truncation=True).input_ids[1:] + [tokenizer.eos_token_id]
+        c_token = tokenizer(target, max_length=900,truncation=True).input_ids[1:] + [tokenizer.eos_token_id]
         loss_masks.extend([1] * len(c_token))
         # print()
         # print(examples["idx"])
@@ -715,11 +699,11 @@ def main():
                 
                 # import pdb; pdb.set_trace()
                 inputs= batch["input_ids"].cpu().numpy()[0]
-                text = extract_sentence([tokenizer.decode(ids, skip_special_tokens=True) for ids in inputs])
+                # text = extract_sentence([tokenizer.decode(ids, skip_special_tokens=True) for ids in inputs])
                 
-                batch['input_ids']=batch['input_ids'].cuda()
-                output = model.generate(inputs = batch['input_ids'], max_new_tokens=50, do_sample=True, top_k=5)
-                generated_sents = tokenizer.batch_decode(output)
+                # batch['input_ids']=batch['input_ids'].cuda()
+                # output = model.generate(inputs = batch['input_ids'], max_new_tokens=50, do_sample=True, top_k=5)
+                # generated_sents = tokenizer.batch_decode(output)
                 # import pdb; pdb.set_trace()
                 # print('*'*100)
                 # print(text)
@@ -809,7 +793,7 @@ def main():
         accelerator.end_training()
 
     if args.output_dir is not None:
-        output_dir_model = args.output_dir + '/final_instruct'
+        output_dir_model = args.output_dir + '/final_pretrain'
         # accelerator.print(f"save checkpoint: {args.output_dir}")
         accelerator.print(f"save checkpoint: {output_dir_model}")
         accelerator.wait_for_everyone()
