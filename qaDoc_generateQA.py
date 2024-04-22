@@ -81,11 +81,11 @@ def compute_f1_score(true_answers, predicted_answer):
     return f1_score
 
 # Function to generate answer for a given question
-def generate_answers(model, tokenizer, device, question, max_length=1500):
+def generate_answers(model, tokenizer, device, question, max_length=4096):
     # Tokenize the question
-    input_ids = tokenizer(question, return_tensors="pt").input_ids.to(device)
+    input_ids = tokenizer(question, return_tensors="pt", max_length=3000, truncation=True).input_ids.to(device)
     # Generate answer using LLAMA causal LM
-    output = model.generate(input_ids, max_length=max_length,temperature=0.3,top_k=50,top_p=0.95,num_return_sequences=1)
+    output = model.generate(input_ids, max_length=max_length,temperature=0.3,top_k=50,top_p=0.95,num_return_sequences=1,max_new_tokens=max_length - input_ids.size(1))
     # Decode the generated output
     generated_answer = tokenizer.decode(output[0], skip_special_tokens=True)
     
@@ -102,11 +102,14 @@ def extract_qa_pairs(generated_QA_answers, article):
     qa_pairs = []
     lines = generated_QA_answers.strip().split('\n')
     for line in lines:
-        if line.startswith('Q') and line[2]==':':
-            q_value = line.split(':')[1].strip()
-        elif line.startswith('A') and line[2]==':':
-            a_value = line.split(':')[1].strip()
-            qa_pairs.append({'context':article,'question': q_value, 'answer': a_value,"prefix": "", "midfix": ""})
+        try:
+            if line.startswith('Q') and line[2]==':':
+                q_value = line.split(':')[1].strip()
+            elif line.startswith('A') and line[2]==':':
+                a_value = line.split(':')[1].strip()
+                qa_pairs.append({'context':article,'question': q_value, 'answer': a_value,"prefix": "", "midfix": ""})
+        except:
+            continue
     return qa_pairs
 
 def main():
@@ -155,17 +158,23 @@ def main():
         generated_answer=generated_answer[len(question):]
         # print('*'*100)
         # print(generated_answer) #[len(question):]
-        siu_train.extend(extract_qa_pairs(generated_QA_answers=generated_answer, article=qa['context']))
+        this_article_qa = extract_qa_pairs(generated_QA_answers=generated_answer, article=qa['context'])
+        siu_train.extend(this_article_qa)
         # print('$'*100)
         # print(true_answer)
         x=1
 
-    f=open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'w')
-    for each_test_sample in siu_train:
         with open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'a') as out:
-            json_str=json.dumps(each_test_sample)
-            out.write(json_str+"\n") 
-            
+            for each_test_sample in this_article_qa:
+                json_str=json.dumps(each_test_sample)
+                out.write(json_str+"\n") 
+
+    # f=open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'w')
+    # for each_test_sample in siu_train:
+    #     with open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'a') as out:
+    #         json_str=json.dumps(each_test_sample)
+    #         out.write(json_str+"\n") 
+
     f=open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_dev.json', 'w')
     dev_list = random.sample(siu_train, 50)
     for each_test_sample in dev_list:
