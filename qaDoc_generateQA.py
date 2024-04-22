@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 train_strategy = 'onlineAdapt'
 # localpath = "/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/NousResearch/Llama-2-7b-chat-hf-lr6.5e-06-seq1600-ratio0.03/final_"+train_strategy
 localpath = "NousResearch/Llama-2-7b-chat-hf" # zero-shot inference/
@@ -81,7 +81,7 @@ def compute_f1_score(true_answers, predicted_answer):
     return f1_score
 
 # Function to generate answer for a given question
-def generate_answer(model, tokenizer, device, question, max_length=1500):
+def generate_answers(model, tokenizer, device, question, max_length=1500):
     # Tokenize the question
     input_ids = tokenizer(question, return_tensors="pt").input_ids.to(device)
     # Generate answer using LLAMA causal LM
@@ -102,11 +102,11 @@ def extract_qa_pairs(generated_QA_answers, article):
     qa_pairs = []
     lines = generated_QA_answers.strip().split('\n')
     for line in lines:
-        if line.startswith('Q'):
+        if line.startswith('Q') and line[2]==':':
             q_value = line.split(':')[1].strip()
-        elif line.startswith('A'):
+        elif line.startswith('A') and line[2]==':':
             a_value = line.split(':')[1].strip()
-            qa_pairs.append({'context':article,'question': q_value, 'answer': a_value})
+            qa_pairs.append({'context':article,'question': q_value, 'answer': a_value,"prefix": "", "midfix": ""})
     return qa_pairs
 
 def main():
@@ -151,13 +151,27 @@ def main():
         # question = 'You are a helpful assistent. Please answer the question with only one sentence as the answer. The question is: '+question
         question="You are a helpful assistant. You generate question-answer pairs from a given news article to help extract infromation from this article. If the answer is not given in this article, skip this question. You generate the question-answer pairs in the format of Q1 A1 Q2 A2 Q3 A3 Q4 A4.\n "+"The article is: "+qa['context']
         # question="You are a helpful assistant. You raise questions from a given news article to help extract infromation from this article. Please generate high-quality question-answer pairs based on this article.\n"+"The article is: "+qa['context']       
-        generated_answer = generate_answer(model, tokenizer, device, question)
-        print('*'*100)
-        print(generated_answer) #[len(question):]
-        siu_train.extend(extract_qa_pairs(generated_QA_answers=generate_answer, article=qa['context']))
+        generated_answer = generate_answers(model, tokenizer, device, question)
+        generated_answer=generated_answer[len(question):]
+        # print('*'*100)
+        # print(generated_answer) #[len(question):]
+        siu_train.extend(extract_qa_pairs(generated_QA_answers=generated_answer, article=qa['context']))
         # print('$'*100)
         # print(true_answer)
         x=1
+
+    f=open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'w')
+    for each_test_sample in siu_train:
+        with open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_train.json', 'a') as out:
+            json_str=json.dumps(each_test_sample)
+            out.write(json_str+"\n") 
+            
+    f=open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_dev.json', 'w')
+    dev_list = random.sample(siu_train, 50)
+    for each_test_sample in dev_list:
+        with open('/shared/nas2/yujiz/effiUpdating/streamingqa/data/onlineAdaptSIUDoc_dev.json', 'a') as out:
+            json_str=json.dumps(each_test_sample)
+            out.write(json_str+"\n") 
 
     # # Perform zero-shot inference and calculate F1 score
     # true_answers = []
