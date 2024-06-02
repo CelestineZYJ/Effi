@@ -14,8 +14,12 @@ from datasets import load_dataset, Dataset
 from functools import partial 
 from dotenv import load_dotenv
 from collections import defaultdict 
+from UniEval.utils import convert_to_json
+from UniEval.metric.evaluator import get_evaluator
 
 load_dotenv() 
+
+# os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 
 MODEL_CONFIGS = {
     'llama3': {
@@ -67,7 +71,7 @@ def construct_context(batch_ins:Dict[str, List], tokenizer, train_strategy, cont
                 {question} [/INST] The response to this question is 
                     """},
                         ]
-            elif 'Index' in train_strategy:
+            elif 'index' in train_strategy:
                 messages = [
                 {"role": "user", "content": f"What company's charcuterie meats have been linked to a multistate salmonella outbreak? "},
                 {"role": "assistant", "content": f"The question is related to the document with index charcuterie-recall-salmonella. The answer based on the doucment is Busseto Food"},
@@ -158,10 +162,19 @@ def compute_qa_metrics(gold:List[str], predicted: str):
         if predicted_answer.lower() == true_answer.lower(): real_em = 1.0
         if  true_answer.lower() in predicted_answer.lower(): include_em = 1.0
 
+    consistency=0.0
+    # for true_answer in gold_answers:
+    #     data = convert_to_json(output_list=[predicted_answer], src_list=[true_answer.lower()])
+    #     # Initialize evaluator for a specific task
+    #     evaluator = get_evaluator('fact')
+    #     # Get factual consistency scores
+    #     consistency = evaluator.evaluate(data, print_result=False)[0]
+
     return {
         'f1': best_f1, 
         'include_em': include_em,
         'real_em': real_em,
+        'consistency': consistency,
         'length': best_length_ratio
     }
 
@@ -175,10 +188,17 @@ if __name__ == '__main__':
     args = parser.parse_args() 
 
 
-    train_strategy = 'realtime200'
-    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
-    localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr6.5e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch+0'
-    localpath = 'llama2'
+    train_strategy = 'realtime200SIU_indexChunkqa' # realtime200  realtime200Inst_indexqa  realtime200SIU_indexqa indexDocrealtime200  realtime200SSIU_indexChunkqa
+    # index 1e-6
+    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr6.5e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0' # realtime200 low include_em
+    # pretrain 1e-5
+    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-05-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
+    # siu index 1e-6
+    localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_1'
+    # inst 1e-7
+    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-07-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
+    # localpath = 'llama2'
+
     if '50' in train_strategy:
         sample_num = '50'
     elif '200' in train_strategy:
@@ -193,10 +213,10 @@ if __name__ == '__main__':
     
     if 'lr' in localpath:
         config = AutoConfig.from_pretrained(
-        localpath, access_token=os.environ['HF_TOKEN'], padding_side='left'
+        localpath
         )
         tokenizer = transformers.AutoTokenizer.from_pretrained(
-            localpath
+            localpath, access_token=os.environ['HF_TOKEN'], padding_side='left'
         )
         terminators = [
             tokenizer.eos_token_id,
