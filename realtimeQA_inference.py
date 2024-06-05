@@ -65,6 +65,11 @@ def construct_context(batch_ins:Dict[str, List], tokenizer, train_strategy, cont
                 {question} [/INST] Response: The question is related to the following information, The response to {question} is 
                     """},
                         ]
+                # messages = [
+                # {"role": "user", "content": f"""<s>[INST] <<SYS>>\nYou are a helpful assistant\n<</SYS>>\n\nYou can check the related document before you answer by putting your checking process enclosed in the <thought> tag. Your answer should be short (a few words or an entity) and specific to the question. Output your final **answer** using the <answer> tag 
+                # {question} [/INST] Response: The question is related to the following document, The response to {question} is 
+                #     """},
+                #         ]
             elif 'Inst' in train_strategy:
                 messages = [
                 {"role": "user", "content": f"""<s>[INST] <<SYS>>\nYou are a helpful assistant\n<</SYS>>\n\n 
@@ -188,13 +193,15 @@ if __name__ == '__main__':
     args = parser.parse_args() 
 
 
-    train_strategy = 'realtime200SIU_indexChunkqa' # realtime200  realtime200Inst_indexqa  realtime200SIU_indexqa indexDocrealtime200  realtime200SSIU_indexChunkqa
-    # index 1e-6
+    train_strategy = 'indexSumChunkrealtime200' # realtime200  realtime200Inst_indexqa  realtime200SIU_indexqa indexDocrealtime200  realtime200SIU_indexChunkqa  indexChunkrealtime200  indexSumChunkrealtime200 indexDocSamerealtime200
+    # index 5e-6   28.5%
+    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr5e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
+    # index 6.5e-6
     # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr6.5e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0' # realtime200 low include_em
     # pretrain 1e-5
-    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-05-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
-    # siu index 1e-6
-    localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_1'
+    localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-05-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
+    # siu 1e-6
+    # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-06-seq5000-ratio0.03/final_'+train_strategy+'/epoch_1'
     # inst 1e-7
     # localpath='/shared/nas2/yujiz/effiUpdating/streamingqa/models/ckpts/shared/nas/data/m1/shared-resource/llm/meta-llama/Llama-2-7b-chat-hf-lr1e-07-seq5000-ratio0.03/final_'+train_strategy+'/epoch_0'
     # localpath = 'llama2'
@@ -279,8 +286,10 @@ if __name__ == '__main__':
             input_len = batch['input_ids'][idx].shape[-1]
             result = tokenizer.decode(output_ids[input_len:], skip_special_tokens=True) # str 
             # prompt = tokenizer.decode(batch['input_ids'][idx], skip_special_tokens=True) 
+
             options = batch['choices'][idx]
             answer_text = [options[int(x)] for x in batch['answer'][idx]]
+
             m = re.search(r'<answer>([^<]+)', result)
             if m:
                 predicted = m.group(1)
